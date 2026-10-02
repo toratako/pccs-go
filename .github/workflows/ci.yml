@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  GOTOOLCHAIN: local
+
+jobs:
+  test:
+    name: Go ${{ matrix.go }} / ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - go: '1.23.x'
+            arch: amd64
+            runner: ubuntu-24.04
+          - go: stable
+            arch: amd64
+            runner: ubuntu-24.04
+          - go: stable
+            arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ matrix.go }}
+          check-latest: true
+          cache: false # Standard-library-only module; no go.sum.
+      - name: Test with race detection, vet, and check formatting
+        run: make check TEST_FLAGS='-race -count=1 -coverprofile=coverage.out -covermode=atomic'
+      - name: Summarize coverage
+        run: go tool cover -func=coverage.out >> "$GITHUB_STEP_SUMMARY"
+      - name: Build and smoke test the executable
+        run: make smoke
+      - name: Upload coverage
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-${{ matrix.go }}-${{ matrix.arch }}
+          path: coverage.out
+          if-no-files-found: error
+          retention-days: 14
+
+  workflows:
+    name: Workflow lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+          cache: false
+      - name: Install actionlint
+        env:
+          GOBIN: ${{ runner.temp }}/ci-tools
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          echo "$GOBIN" >> "$GITHUB_PATH"
+      - run: make lint-ci
+
+  snapshot:
+    name: Release snapshot
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+          check-latest: true
+          cache: false
+      - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        with:
+          version: v2.18.2
+          install-only: true
+      - run: make release-check release-snapshot
+      - name: Verify checksums and smoke test the packaged executable
+        run: |
+          cd dist
+          sha256sum --check checksums.txt
+          mkdir unpacked
+          tar -xzf pccs_*_linux_amd64.tar.gz -C unpacked
+          version=$(jq -r .version metadata.json)
+          bash ../scripts/smoke-test.sh unpacked/pccs "$version"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-snapshot
+          path: |
+            dist/*.tar.gz
+            dist/checksums.txt
+          if-no-files-found: error
+          retention-days: 7
+
+  required:
+    name: CI passed
+    if: ${{ always() }}
+    needs: [test, workflows, snapshot]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    steps:
+      - name: Require all checks to pass
+        env:
+          TEST_RESULT: ${{ needs.test.result }}
+          WORKFLOWS_RESULT: ${{ needs.workflows.result }}
+          SNAPSHOT_RESULT: ${{ needs.snapshot.result }}
+        run: |
+          test "$TEST_RESULT" = success
+          test "$WORKFLOWS_RESULT" = success
+          test "$SNAPSHOT_RESULT" = success

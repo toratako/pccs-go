@@ -1,0 +1,49 @@
+name: Bug report
+description: Report a reproducible problem in the Go PCCS service.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For security issues, follow SECURITY.md instead of opening a public issue.
+        Remove tokens, PCS subscription keys, private keys, platform identifiers,
+        and private collateral before attaching logs or configuration.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `pccs version`, or the commit for a source build.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Linux distribution, CPU architecture, and Go version if built locally.
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Cache mode
+      options: [LAZY, REQ, OFFLINE, Not applicable]
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Include minimal commands or sanitized requests and configuration.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs
+      render: text

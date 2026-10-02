@@ -1,0 +1,39 @@
+version: 2
+
+project_name: pccs
+
+builds:
+  - id: pccs
+    main: ./cmd/pccs
+    binary: pccs
+    env:
+      - CGO_ENABLED=0
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X github.com/toratako/pccs-go/internal/cli.Version={{ .Version }}
+    mod_timestamp: '{{ .CommitTimestamp }}'
+
+archives:
+  - formats: [tar.gz]
+    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    files:
+      - LICENSE
+      - NOTICE
+      - README.md
+      - SECURITY.md
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+snapshot:
+  version_template: '{{ .Version }}-dev-{{ .ShortCommit }}'
+
+changelog:
+  use: github-native
+
+release:
+  name_template: 'PCCS in Go {{ .Tag }} (unofficial)'
+  prerelease: auto

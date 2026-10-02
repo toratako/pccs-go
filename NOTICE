@@ -1,0 +1,32 @@
+PCCS in Go is an independent personal port maintained by toratako.
+It is not affiliated with, endorsed by, or supported by Intel.
+
+Original Go contributions: Copyright (C) 2026 toratako and contributors.
+Upstream portions: Copyright (C) 2011-2026 Intel Corporation.
+Both are distributed under the BSD-3-Clause terms in LICENSE.
+
+Upstream source:
+https://github.com/intel/confidential-computing.tee.dcap.pccs
+Reference revision: 6308e118d962e9ce1b18b9d799164bb056a60a2d
+
+The port adapts the upstream PCCS API, input validation, PCS requests, cache
+policies, collateral import, and certificate selection. Relevant upstream
+sources include service/routes, service/controllers, service/constants,
+service/services (including caching_modes), service/pcs_client, and
+service/pckCertSelection. Their adapted portions are in internal/server,
+internal/service, internal/pcs, and internal/collateral.
+
+internal/collateral/selection.go and tcb.go translate the PCK selection and
+TCB comparison logic from service/pckCertSelection/pckCertSelection.js and
+Tcb.js. Selection tests adapt upstream cases. These upstream files are
+Copyright (C) 2025 Intel Corporation.
+
+internal/collateral/testdata/pck_certificates.json copies the eleven PCK
+certificate fixtures from service/pckCertSelection/pckCertSelection.test.js,
+Copyright (C) 2025 Intel Corporation. See the adjacent README.txt for their
+test-only purpose. They are not trust anchors supplied for deployment.
+
+Intel notices are retained for upstream-derived material. They do not
+attribute the independent Go implementation or its maintenance to Intel.
+This distribution does not bundle Intel enclave binaries or the Node.js
+service and its npm dependencies.
